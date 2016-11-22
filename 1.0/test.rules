@@ -1,0 +1,76 @@
+# (Example rules for sim_validator)
+#
+# $Id: test.rules 2006 2009-07-31 14:22:56Z lsc $
+# 
+# Copyright (c) 2009 STFC Rutherford Appleton Laboratory 
+# Author: Lee-Shawn Chin 
+# Date  : June 2009
+#
+# NOTE: This is a proof-of-concept implementation. It was not designed for
+#       production use but merely to explore what is possible
+#       Use at your own risk ;)
+#
+#
+#########################################################################
+
+# VARIABLES: For now, we do not support nested data structures or arrays 
+#            embedded within data structures. Supported formats are:
+#            - variable_name = AgentName(memoryVariable)
+#            - variable_name = AgentName(datastruct.member)
+#            - variable_name = AgentName(array[])
+#            - variable_name = AgentName(arrayOfDatastruct[].member)
+
+::VARIABLES
+
+firm_payment_account       = Firm(payment_account)
+igfirm_payment_account     = IGFirm(payment_account)
+hh_payment_account         = Household(payment_account)
+total_credit_in_bank       = Bank(total_credit)
+total_loans_given_to_firms = Firm(loans[].loan_value)
+fiat_money_in_ecb          = Central_Bank(fiat_money)
+bank_deposits          = Bank(deposits)
+bank_credits           = Bank(total_credit)
+bank_cash              = Bank(cash)
+household_expenditures          = Household(expenditures)
+govt_monthly_cons_expenditure   = Government(monthly_consumption_expenditure)
+firm_cum_revenue                = Firm(cum_revenue)
+firm_current_shares_outstanding = Firm(current_shares_outstanding)
+igfirm_current_shares_outstanding = IGFirm(outstanding_shares)
+govt_outstanding_bonds          = Government(bond.nr_outstanding)
+ecb_bond_quantity               = Central_Bank(nr_gov_bonds)
+household_assets                = Household(assetsowned[].quantity)
+firm_labour_cost       = Firm(labour_costs)
+hh_wage                = Household(wage)
+
+#########################################################################
+::CONSTANTS
+
+# while not necessary, using all caps for constants help us to identify
+# them within the rules
+PRECISION = 0.0001 # tolerance when comparing doubles
+
+#########################################################################
+::RULES
+
+
+# supported comparision operator are "==", ">=", "<=", "<", ">", "!=". Every  
+#    rule must have ONE comparison operator
+# supported math operators are "(", "+", "-", "*", "/", "%", ")"
+# supported functions are abs(), min(), max(), pow(), round()
+
+
+abs(firm_labour_cost - hh_wage) < PRECISION
+
+# comparing integers. straight-forward.
+firm_current_shares_outstanding + govt_outstanding_bonds + ecb_bond_quantity + igfirm_current_shares_outstanding == household_assets
+
+# this may fail (comparing floating point values directly is dangerous)
+total_credit_in_bank == total_loans_given_to_firms
+# this will do what you want
+abs(total_credit_in_bank - total_loans_given_to_firms) < PRECISION
+
+fiat_money_in_ecb == bank_deposits + bank_cash - bank_credits
+
+household_expenditures + govt_monthly_cons_expenditure == firm_cum_revenue
+
+abs(firm_payment_account + hh_payment_account - bank_deposits) < PRECISION

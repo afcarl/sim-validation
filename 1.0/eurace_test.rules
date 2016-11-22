@@ -1,0 +1,174 @@
+# (Example rules for sim_validator)
+#
+# $Id: test.rules 1892 2009-06-18 16:08:55Z lsc $
+# 
+# Copyright (c) 2009 STFC Rutherford Appleton Laboratory 
+# Author: Lee-Shawn Chin 
+# Date  : June 2009
+#
+# NOTE: This is a proof-of-concept implementation. It was not designed for
+#       production use but merely to explore what is possible
+#       Use at your own risk ;)
+#
+# Edited: Sander van der Hoog
+# Date  : July 2009
+#
+#########################################################################
+::VARIABLES
+
+#Balance sheet: Firm
+firm_payment_account  		= Firm(payment_account)
+firm_cum_revenue                = Firm(cum_revenue)
+firm_current_shares_outstanding = Firm(current_shares_outstanding)
+firms_total_loans 		= Firm(loans[].loan_value)
+firm_tax_payment		= Firm(tax_payment)
+firm_debt_installments		= Firm(total_debt_installment_payment)
+firm_interest_payments_to_banks = Firm(total_interest_payment)
+firm_total_dividends 	= Firm(total_dividend_payment)
+firm_total_value_local_inventory = Firm(total_value_local_inventory)
+firm_total_value_capital_stock	= Firm(total_value_capital_stock)
+firm_total_debt			= Firm(total_debt)
+firm_equity			= Firm(equity)
+firm_active			= Firm(active)
+
+#Balance sheet: IGFirm
+igfirm_payment_account  	= IGFirm(payment_account)
+igfirm_current_shares_outstanding = IGFirm(outstanding_shares)
+igfirm_tax_payment		= IGFirm(tax_payment)
+igfirm_net_profit		= IGFirm(net_profit) 
+igfirm_dividend_per_share 	= IGFirm(current_dividend_per_share)
+igfirm_total_dividends = igfirm_dividend_per_share*igfirm_current_shares_outstanding
+
+#Balance sheet: Household
+hh_payment_account  		= Household(payment_account)
+household_expenditures          = Household(monthly_consumption_expenditure)
+household_assets                = Household(assetsowned[].quantity)
+household_tax_payment		= Household(tax_payment)
+household_dividend_daily		= Household(received_dividend)
+
+#Balance sheet: Bank
+bank_deposits           	= Bank(deposits)
+bank_credit            		= Bank(total_credit)
+bank_cash               	= Bank(cash)
+bank_payment_account            = Bank(cash)
+bank_tax_payment		= Bank(taxes)
+bank_loan_installments  	= Bank(firm_loan_installments)
+bank_interest_payments_from_firms = Bank(firm_interest_payments)
+bank_ecb_debt 			= Bank(ecb_debt)
+bank_ecb_interest_payment	= Bank(ecb_interest_payment)
+bank_equity			= Bank(equity)
+bank_current_shares_outstanding	= Bank(current_shares_outstanding)
+bank_total_dividends 	= Bank(total_dividends)
+
+#Balance sheet: ECB
+ecb_fiat_money_banks          	= Central_Bank(fiat_money_banks)
+ecb_fiat_money_govs          	= Central_Bank(fiat_money_govs)
+ecb_bond_quantity               = Central_Bank(nr_gov_bonds)
+ecb_bank_interest 		= Central_Bank(bank_interest)
+ecb_bond_holdings_value		= Central_Bank(bond_holdings_value)
+ecb_total_deposits		= Central_Bank(ecb_deposits)
+ecb_cash			= Central_Bank(cash)
+
+#Balance sheet: Government
+govt_monthly_cons_expenditure   = Government(monthly_consumption_expenditure)
+govt_outstanding_bonds          = Government(bond.nr_outstanding)
+govt_monthly_tax_revenues	= Government(monthly_tax_revenues)
+gov_payment_account		= Government(payment_account)
+gov_total_debt			= Government(total_debt)
+gov_value_bonds			= Government(bond.face_value)
+
+
+#Eurostat
+eurostat_no_firms		= Eurostat(no_firms)
+eurostat_no_firm_deaths		= Eurostat(no_firm_deaths)
+
+#########################################################################
+::CONSTANTS
+
+# while not necessary, using all caps for constants help us to identify
+# them within the rules
+PRECISION = 0.5 # tolerance when comparing doubles
+
+#########################################################################
+::RULES
+
+
+########################## Balance Sheets ################################
+#RULE VERIFIED
+#Firm:
+abs( firm_payment_account + firm_total_value_local_inventory + firm_total_value_capital_stock - firm_total_debt - firm_equity)< PRECISION
+
+#RULE FAILED
+#IGFirm:
+abs( igfirm_net_profit - igfirm_total_dividends)< PRECISION
+
+#RULE VERIFIED
+#Bank:
+abs( bank_cash + bank_credit - bank_equity - bank_ecb_debt - bank_deposits)< PRECISION
+
+#RULE TO CHECK
+#HH
+
+#RULE VERIFIED
+#Gov
+abs( gov_total_debt - gov_value_bonds*govt_outstanding_bonds)< PRECISION
+
+#RULE FAILED
+#ECB: The issued fiat money equals the total value of bond holdings of the ECB
+abs( ecb_bond_holdings_value + ecb_cash - ecb_fiat_money_banks - ecb_fiat_money_govs)< PRECISION
+
+
+########################## General Rules ################################
+#RULE VERIFIED
+#Payment accounts:
+abs( firm_payment_account + igfirm_payment_account + hh_payment_account - bank_deposits) < PRECISION
+
+#RULE VERIFIED
+#Credit money:
+abs( bank_credit - firms_total_loans) < PRECISION
+
+#RULE FAILED
+#Fiat money: count all cash in the banking sector and in the public sector (government). This should equal the fiat money #created by the central bank and given to government, plus all ecb debt given to the banks. 
+
+abs( bank_deposits + bank_cash + gov_payment_account + ecb_cash - bank_credit - ecb_fiat_money_govs - ecb_fiat_money_banks) < PRECISION
+
+#RULE FAILED
+#Monthly consumption expenditures:
+abs( household_expenditures + govt_monthly_cons_expenditure - firm_cum_revenue) < PRECISION 
+
+#RULE VERIFIED
+#Total firm shares + Gov bonds = Household's holdings of shares and bonds + ECB's holdings of Gov bonds
+abs( firm_current_shares_outstanding + igfirm_current_shares_outstanding + bank_current_shares_outstanding + govt_outstanding_bonds + ecb_bond_quantity - household_assets) < PRECISION
+
+#RULE FAILED
+#Debt installment payments by firms to banks: 
+abs( firm_debt_installments - bank_loan_installments) < PRECISION
+
+#RULE FAILED
+#Interest payments by firms to banks:
+abs( firm_interest_payments_to_banks - bank_interest_payments_from_firms) < PRECISION
+
+#RULE VERIFIED
+#Taxes: 
+abs( firm_tax_payment + igfirm_tax_payment + household_tax_payment + bank_tax_payment - govt_monthly_tax_revenues) < PRECISION
+
+#RULE FAILED
+#Deposits at ECB
+abs( bank_payment_account + gov_payment_account - ecb_total_deposits)< PRECISION
+
+#RULE FAILED
+#Bank's ECB debt
+#The total debt of banks to ecb is found on the ECB balance sheet (LHS), and on the bank balance sheet (RHS)
+abs( ecb_fiat_money_banks - ecb_bond_holdings_value - bank_ecb_debt)< PRECISION
+
+#RULE FAILED
+#Bank's interest payments on central bank loans:  FAILED : both are 0
+abs( bank_ecb_interest_payment - ecb_bank_interest) < PRECISION
+
+#RULE VERIFIED
+#Check nr active firms: 
+abs( eurostat_no_firms - firm_active - eurostat_no_firm_deaths) < PRECISION
+
+#RULE FAILED
+#Daily dividend payments send and received
+abs( firm_total_dividends + igfirm_total_dividends + bank_total_dividends - household_dividend_daily) < PRECISION
